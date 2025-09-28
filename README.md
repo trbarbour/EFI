@@ -18,3 +18,30 @@ This repository stores firmware artifacts that are built in the Codex workspace.
   ```
 * **Output**: `Build/FtdiUsbSerial/RELEASE_GCC5/X64/FtdiUsbSerialDxe.efi`
 The X64 binary above was built on this branch for use with the Minix Z350-0dB's UEFI.
+
+## Building the firmware with Nix
+
+A `default.nix` expression is provided so that the EDK II UEFI Shell and the
+FTDI USB Serial DXE driver can be reproduced on NixOS. Evaluating the
+expression reuses the pre-built shell from `nixpkgs#edk2-uefi-shell`, fetches
+the upstream EDK II sources necessary for the driver, builds it with the
+standard BaseTools toolchain, and then stages both firmware binaries under
+`$out/share/firmware`.
+
+To build the firmware, run:
+
+```bash
+nix-build
+```
+
+The resulting symlink named `result` will contain:
+
+* `share/firmware/Shell.efi`
+* `share/firmware/FtdiUsbSerialDxe.efi`
+* `share/firmware/Shell.nixpkgs.efi` (the reference shell binary that ships with
+  `nixpkgs#edk2-uefi-shell`)
+
+These two binaries can be copied onto a FAT-formatted USB stick and loaded by
+UEFI firmware on the Minix Z350-0dB fanless mini-PC. The driver may also be
+loaded from the UEFI shell using `load fs0:\EFI\FtdiUsbSerialDxe.efi` once the
+USB stick has been mounted.
