@@ -28,6 +28,16 @@ let
 
   toolchainTag = if stdenv.cc.isClang then "CLANGPDB" else "GCC5";
 
+  mkWorkspace = ''
+    cp -r ${edk2PlatformsSrc} ../edk2-platforms
+    cp -r ${edk2NonOsiSrc} ../edk2-non-osi
+    chmod -R u+w ../edk2-platforms ../edk2-non-osi
+    workspace=$PWD
+    platforms=$PWD/../edk2-platforms
+    nonosi=$PWD/../edk2-non-osi
+    export PACKAGES_PATH="$workspace:$platforms/Drivers:$platforms:$nonosi"
+  '';
+
   driver = edk2.mkDerivation "FtdiUsbSerialStandalone.dsc" (
     finalAttrs:
     {
@@ -50,14 +60,7 @@ let
         + " -a X64 -b RELEASE -t ${toolchainTag}";
 
       preConfigure = ''
-        cp -r ${edk2PlatformsSrc} ../edk2-platforms
-        cp -r ${edk2NonOsiSrc} ../edk2-non-osi
-        chmod -R u+w ../edk2-platforms ../edk2-non-osi
-        workspace=$PWD
-        platforms=$PWD/../edk2-platforms
-        nonosi=$PWD/../edk2-non-osi
-        export PACKAGES_PATH="$workspace:$platforms/Drivers:$platforms:$nonosi"
-
+        ${mkWorkspace}
         cat > FtdiUsbSerialStandalone.dsc <<'EOF'
         [Defines]
           PLATFORM_NAME                  = FtdiUsbSerialStandalone
@@ -107,6 +110,49 @@ let
       dontPatchELF = true;
     }
   );
+
+  terminal = edk2.mkDerivation "MdeModulePkg/MdeModulePkg.dsc" (
+    finalAttrs:
+    {
+      pname = "edk2-terminal-dxe";
+      inherit version;
+
+      nativeBuildInputs =
+        [
+          python3
+          nasm
+          util-linux
+        ]
+        ++ lib.optionals stdenv.cc.isClang [
+          llvmPackages.bintools
+          llvmPackages.llvm
+        ];
+
+      buildFlags =
+        "-m MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf"
+        + " -a X64 -b RELEASE -t ${toolchainTag}";
+
+      preConfigure = ''
+        ${mkWorkspace}
+      '';
+
+      installPhase = ''
+        runHook preInstall
+
+        terminal_out=$(find Build -name TerminalDxe.efi -print -quit)
+        if [ -z "$terminal_out" ]; then
+          echo "unable to locate built Terminal DXE driver" >&2
+          exit 1
+        fi
+        install -Dm644 "$terminal_out" $out/TerminalDxe.efi
+
+        runHook postInstall
+      '';
+
+      dontStrip = true;
+      dontPatchELF = true;
+    }
+  );
 in
 stdenv.mkDerivation {
   pname = "edk2-shell-ftdi";
@@ -122,6 +168,8 @@ stdenv.mkDerivation {
       $out/share/firmware/Shell.efi
     install -Dm644 ${driver}/FtdiUsbSerialDxe.efi \
       $out/share/firmware/FtdiUsbSerialDxe.efi
+    install -Dm644 ${terminal}/TerminalDxe.efi \
+      $out/share/firmware/TerminalDxe.efi
     install -Dm644 ${edk2-uefi-shell}/shell.efi \
       $out/share/firmware/Shell.nixpkgs.efi
 
@@ -130,15 +178,16 @@ stdenv.mkDerivation {
 
   passthru = {
     inherit driver;
+    inherit terminal;
     inherit (edk2-uefi-shell.passthru) efi;
   };
 
   meta = with lib; {
-    description = "EDK II UEFI Shell and FTDI USB serial driver binaries";
+    description = "EDK II UEFI Shell plus FTDI USB serial and Terminal DXE binaries";
     longDescription = ''
       This package reuses the pre-built UEFI shell from nixpkgs and compiles the
-      FTDI USB Serial DXE driver so they can be deployed on systems such as the
-      Minix Z350-0dB fanless x86 mini-PC.
+      FTDI USB Serial and Terminal DXE drivers so they can be deployed on systems
+      such as the Minix Z350-0dB fanless x86 mini-PC.
     '';
     homepage = "https://github.com/tianocore/edk2";
     license = with licenses; [ bsd2 bsd3 ];
