@@ -153,6 +153,49 @@ let
       dontPatchELF = true;
     }
   );
+
+  consplitter = edk2.mkDerivation "MdeModulePkg/MdeModulePkg.dsc" (
+    finalAttrs:
+    {
+      pname = "edk2-consplitter-dxe";
+      inherit version;
+
+      nativeBuildInputs =
+        [
+          python3
+          nasm
+          util-linux
+        ]
+        ++ lib.optionals stdenv.cc.isClang [
+          llvmPackages.bintools
+          llvmPackages.llvm
+        ];
+
+      buildFlags =
+        "-m MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf"
+        + " -a X64 -b RELEASE -t ${toolchainTag}";
+
+      preConfigure = ''
+        ${mkWorkspace}
+      '';
+
+      installPhase = ''
+        runHook preInstall
+
+        consplitter_out=$(find Build -name ConSplitterDxe.efi -print -quit)
+        if [ -z "$consplitter_out" ]; then
+          echo "unable to locate built ConSplitter DXE driver" >&2
+          exit 1
+        fi
+        install -Dm644 "$consplitter_out" $out/ConSplitterDxe.efi
+
+        runHook postInstall
+      '';
+
+      dontStrip = true;
+      dontPatchELF = true;
+    }
+  );
 in
 stdenv.mkDerivation {
   pname = "edk2-shell-ftdi";
@@ -170,6 +213,8 @@ stdenv.mkDerivation {
       $out/share/firmware/FtdiUsbSerialDxe.efi
     install -Dm644 ${terminal}/TerminalDxe.efi \
       $out/share/firmware/TerminalDxe.efi
+    install -Dm644 ${consplitter}/ConSplitterDxe.efi \
+      $out/share/firmware/ConSplitterDxe.efi
     install -Dm644 ${edk2-uefi-shell}/shell.efi \
       $out/share/firmware/Shell.nixpkgs.efi
 
@@ -179,15 +224,16 @@ stdenv.mkDerivation {
   passthru = {
     inherit driver;
     inherit terminal;
+    inherit consplitter;
     inherit (edk2-uefi-shell.passthru) efi;
   };
 
   meta = with lib; {
-    description = "EDK II UEFI Shell plus FTDI USB serial and Terminal DXE binaries";
+    description = "EDK II UEFI Shell plus FTDI USB serial, Terminal, and ConSplitter DXE binaries";
     longDescription = ''
       This package reuses the pre-built UEFI shell from nixpkgs and compiles the
-      FTDI USB Serial and Terminal DXE drivers so they can be deployed on systems
-      such as the Minix Z350-0dB fanless x86 mini-PC.
+      FTDI USB Serial, Terminal, and ConSplitter DXE drivers so they can be deployed
+      on systems such as the Minix Z350-0dB fanless x86 mini-PC.
     '';
     homepage = "https://github.com/tianocore/edk2";
     license = with licenses; [ bsd2 bsd3 ];
