@@ -22,7 +22,7 @@ The X64 binary above was built on this branch for use with the Minix Z350-0dB's 
 ## Building the firmware with Nix
 
 A `default.nix` expression is provided so that the EDK II UEFI Shell and the
-FTDI USB Serial plus Terminal DXE drivers can be reproduced on NixOS.
+FTDI USB Serial plus Terminal and ConSplitter DXE drivers can be reproduced on NixOS.
 Evaluating the expression reuses the pre-built shell from
 `nixpkgs#edk2-uefi-shell`, fetches the upstream EDK II sources necessary for the
 drivers, builds them with the standard BaseTools toolchain, and then stages the
@@ -39,10 +39,11 @@ The resulting symlink named `result` will contain:
 * `share/firmware/Shell.efi`
 * `share/firmware/FtdiUsbSerialDxe.efi`
 * `share/firmware/TerminalDxe.efi`
+* `share/firmware/ConSplitterDxe.efi`
 * `share/firmware/Shell.nixpkgs.efi` (the reference shell binary that ships with
   `nixpkgs#edk2-uefi-shell`)
 
-These three binaries can be copied onto a FAT-formatted USB stick and loaded by
+These binaries can be copied onto a FAT-formatted USB stick and loaded by
 UEFI firmware on the Minix Z350-0dB fanless mini-PC. The driver may also be
 loaded from the UEFI shell using `load fs0:\EFI\FtdiUsbSerialDxe.efi` once the
 USB stick has been mounted.
